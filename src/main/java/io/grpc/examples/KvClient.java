@@ -1,6 +1,12 @@
 package io.grpc.examples;
 
+import java.util.Random;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
 import com.google.protobuf.ByteString;
+
 import io.grpc.Channel;
 import io.grpc.Status.Code;
 import io.grpc.StatusRuntimeException;
@@ -9,15 +15,12 @@ import io.grpc.examples.proto.CreateResponse;
 import io.grpc.examples.proto.DeleteRequest;
 import io.grpc.examples.proto.DeleteResponse;
 import io.grpc.examples.proto.KeyValueServiceGrpc;
-import io.grpc.examples.proto.KeyValueServiceGrpc.KeyValueServiceBlockingStub;
+import io.grpc.examples.proto.KeyValueServiceGrpc.KeyValueServiceStub;
 import io.grpc.examples.proto.RetrieveRequest;
 import io.grpc.examples.proto.RetrieveResponse;
 import io.grpc.examples.proto.UpdateRequest;
 import io.grpc.examples.proto.UpdateResponse;
-import java.util.Random;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import io.grpc.stub.StreamObserver;
 
 /**
  * Performs sample work load, by creating random keys and values, retrieving them, updating them,
@@ -48,7 +51,7 @@ final class KvClient {
    */
   void doClientWork(AtomicBoolean done) {
     Random random = new Random();
-    KeyValueServiceBlockingStub stub = KeyValueServiceGrpc.newBlockingStub(channel);
+    KeyValueServiceStub stub = KeyValueServiceGrpc.newStub(channel);
 
     while (!done.get()) {
       // Pick a random CRUD action to take.
@@ -77,17 +80,32 @@ final class KvClient {
   /**
    * Creates a random key and value.
    */
-  private void doCreate(KeyValueServiceBlockingStub stub) {
+  private void doCreate(KeyValueServiceStub stub) {
     ByteString key = createRandomKey();
     try {
-      CreateResponse res = stub.create(
-          CreateRequest.newBuilder()
-              .setKey(key)
-              .setValue(randomBytes(MEAN_VALUE_SIZE))
-              .build());
-      if (!res.equals(CreateResponse.getDefaultInstance())) {
-        throw new RuntimeException("Invalid response");
-      }
+      stub.create(
+              CreateRequest.newBuilder()
+                      .setKey(key)
+                      .setValue(randomBytes(MEAN_VALUE_SIZE))
+                      .build(), new StreamObserver<CreateResponse>() {
+                @Override
+                public void onNext(CreateResponse res) {
+                  if (!res.equals(CreateResponse.getDefaultInstance())) {
+                    throw new RuntimeException("Invalid response");
+                  }
+                }
+
+                @Override
+                public void onError(Throwable t) {
+
+                }
+
+                @Override
+                public void onCompleted() {
+
+                }
+              });
+
     } catch (StatusRuntimeException e) {
       if (e.getStatus().getCode() == Code.ALREADY_EXISTS) {
         knownKeys.remove(key);
@@ -100,16 +118,32 @@ final class KvClient {
 
   /**
    * Retrieves the value of a random key.
+   * @param stub
    */
-  private void doRetrieve(KeyValueServiceBlockingStub stub) {
+  private void doRetrieve(KeyValueServiceStub stub) {
     ByteString key = knownKeys.getRandomKey();
     try {
-      RetrieveResponse res = stub.retrieve(RetrieveRequest.newBuilder()
-          .setKey(key)
-          .build());
-      if (res.getValue().size() < 1) {
-        throw new RuntimeException("Invalid response");
-      }
+      stub.retrieve(RetrieveRequest.newBuilder()
+              .setKey(key)
+              .build(), new StreamObserver<RetrieveResponse>() {
+        @Override
+        public void onNext(RetrieveResponse value) {
+          if (value.getValue().size() < 1) {
+            throw new RuntimeException("Invalid response");
+          }
+        }
+
+        @Override
+        public void onError(Throwable t) {
+
+        }
+
+        @Override
+        public void onCompleted() {
+
+        }
+      });
+
     } catch (StatusRuntimeException e) {
       if (e.getStatus().getCode() == Code.NOT_FOUND) {
         knownKeys.remove(key);
@@ -122,17 +156,33 @@ final class KvClient {
 
   /**
    * Updates a random key with a random value.
+   * @param stub
    */
-  private void doUpdate(KeyValueServiceBlockingStub stub) {
+  private void doUpdate(KeyValueServiceStub stub) {
     ByteString key = knownKeys.getRandomKey();
     try {
-      UpdateResponse res = stub.update(UpdateRequest.newBuilder()
-          .setKey(key)
-          .setValue(randomBytes(MEAN_VALUE_SIZE))
-          .build());
-      if (!res.equals(UpdateResponse.getDefaultInstance())) {
-        throw new RuntimeException("Invalid response");
-      }
+      stub.update(UpdateRequest.newBuilder()
+              .setKey(key)
+              .setValue(randomBytes(MEAN_VALUE_SIZE))
+              .build(), new StreamObserver<UpdateResponse>() {
+        @Override
+        public void onNext(UpdateResponse value) {
+          if (!value.equals(UpdateResponse.getDefaultInstance())) {
+            throw new RuntimeException("Invalid response");
+          }
+        }
+
+        @Override
+        public void onError(Throwable t) {
+
+        }
+
+        @Override
+        public void onCompleted() {
+
+        }
+      });
+
     } catch (StatusRuntimeException e) {
       if (e.getStatus().getCode() == Code.NOT_FOUND) {
         knownKeys.remove(key);
@@ -145,14 +195,30 @@ final class KvClient {
 
   /**
    * Deletes the value of a random key.
+   * @param stub
    */
-  private void doDelete(KeyValueServiceBlockingStub stub) {
+  private void doDelete(KeyValueServiceStub stub) {
     ByteString key = knownKeys.getRandomKey();
-    DeleteResponse res = stub.delete(DeleteRequest.newBuilder().setKey(key).build());
-    knownKeys.remove(key);
-    if (!res.equals(DeleteResponse.getDefaultInstance())) {
-      throw new RuntimeException("Invalid response");
-    }
+    stub.delete(DeleteRequest.newBuilder().setKey(key).build(), new StreamObserver<DeleteResponse>() {
+      @Override
+      public void onNext(DeleteResponse value) {
+        knownKeys.remove(key);
+        if (!value.equals(DeleteResponse.getDefaultInstance())) {
+          throw new RuntimeException("Invalid response");
+        }
+      }
+
+      @Override
+      public void onError(Throwable t) {
+
+      }
+
+      @Override
+      public void onCompleted() {
+
+      }
+    });
+
   }
 
   /**

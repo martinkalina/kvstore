@@ -1,6 +1,12 @@
 package io.grpc.examples;
 
+import java.nio.ByteBuffer;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
+
 import com.google.protobuf.ByteString;
+
 import io.grpc.Status;
 import io.grpc.examples.proto.CreateRequest;
 import io.grpc.examples.proto.CreateResponse;
@@ -12,10 +18,6 @@ import io.grpc.examples.proto.RetrieveResponse;
 import io.grpc.examples.proto.UpdateRequest;
 import io.grpc.examples.proto.UpdateResponse;
 import io.grpc.stub.StreamObserver;
-import java.nio.ByteBuffer;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.TimeUnit;
 
 
 /**
@@ -28,10 +30,10 @@ final class KvService extends KeyValueServiceImplBase {
   private static final long READ_DELAY_MILLIS = 10;
   private static final long WRITE_DELAY_MILLIS = 50;
 
-  private final Map<ByteBuffer, ByteBuffer> store = new HashMap<>();
+  private final Map<ByteBuffer, ByteBuffer> store = new ConcurrentHashMap<>();
 
   @Override
-  public synchronized void create(
+  public void create(
       CreateRequest request, StreamObserver<CreateResponse> responseObserver) {
     ByteBuffer key = request.getKey().asReadOnlyByteBuffer();
     ByteBuffer value = request.getValue().asReadOnlyByteBuffer();
@@ -45,7 +47,7 @@ final class KvService extends KeyValueServiceImplBase {
   }
 
   @Override
-  public synchronized void retrieve(RetrieveRequest request,
+  public  void retrieve(RetrieveRequest request,
       StreamObserver<RetrieveResponse> responseObserver) {
     ByteBuffer key = request.getKey().asReadOnlyByteBuffer();
     simulateWork(READ_DELAY_MILLIS);
@@ -60,7 +62,7 @@ final class KvService extends KeyValueServiceImplBase {
   }
 
   @Override
-  public synchronized void update(
+  public  void update(
       UpdateRequest request, StreamObserver<UpdateResponse> responseObserver) {
     ByteBuffer key = request.getKey().asReadOnlyByteBuffer();
     ByteBuffer newValue = request.getValue().asReadOnlyByteBuffer();
@@ -76,7 +78,7 @@ final class KvService extends KeyValueServiceImplBase {
   }
 
   @Override
-  public synchronized void delete(
+  public  void delete(
       DeleteRequest request, StreamObserver<DeleteResponse> responseObserver) {
     ByteBuffer key = request.getKey().asReadOnlyByteBuffer();
     simulateWork(WRITE_DELAY_MILLIS);

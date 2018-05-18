@@ -1,17 +1,18 @@
 package io.grpc.examples;
 
-import io.grpc.ManagedChannel;
-import io.grpc.ManagedChannelBuilder;
-import io.grpc.Server;
-import io.grpc.ServerBuilder;
 import java.io.IOException;
-import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
+import io.grpc.ManagedChannel;
+import io.grpc.ManagedChannelBuilder;
+import io.grpc.Server;
+import io.grpc.ServerBuilder;
 
 
 /**
@@ -21,10 +22,11 @@ import java.util.logging.Logger;
 public final class KvRunner {
   private static final Logger logger = Logger.getLogger(KvRunner.class.getName());
 
-  private static final long DURATION_SECONDS = 60;
+  private static final long DURATION_SECONDS = 5;
 
   private Server server;
   private ManagedChannel channel;
+  private ExecutorService executor;
 
   public static void main(String []args) throws Exception {
     KvRunner store = new KvRunner();
@@ -62,7 +64,12 @@ public final class KvRunner {
     if (server != null) {
       throw new IllegalStateException("Already started");
     }
-    server = ServerBuilder.forPort(0).addService(new KvService()).build();
+    executor = Executors.newFixedThreadPool(100);
+    server = ServerBuilder
+            .forPort(0)
+            .executor(executor)
+            .addService(new KvService())
+            .build();
     server.start();
   }
 
@@ -74,6 +81,7 @@ public final class KvRunner {
     server = null;
     s.shutdown();
     if (s.awaitTermination(1, TimeUnit.SECONDS)) {
+      executor.shutdown();
       return;
     }
     s.shutdownNow();
